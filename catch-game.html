@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星空追逐战</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            /* 添加背景图片 */
+            background-image: url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80');
+            background-size: cover;
+            background-position: center;
+            /* 添加半透明黑色覆盖层增加对比度 */
+            box-shadow: inset 0 0 0 1000px rgba(0, 0, 0, 0.3);
+        }
+        
+        #player {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-color: #4CAF50;
+            border-radius: 50%;
+            z-index: 10;
+            transition: transform 0.1s ease-out;
+            /* 添加发光效果使在背景上更明显 */
+            box-shadow: 0 0 10px 5px rgba(76, 175, 80, 0.5);
+        }
+        
+        .enemy {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            background-color: #F44336;
+            border-radius: 50%;
+            z-index: 5;
+            /* 添加发光效果使在背景上更明显 */
+            box-shadow: 0 0 10px 5px rgba(244, 67, 54, 0.5);
+        }
+        
+        #score-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            z-index: 20;
+            /* 添加背景使文字更清晰 */
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 15px;
+            border-radius: 5px;
+        }
+        
+        #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+        }
+        
+        #game-over h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        #restart-btn {
+            padding: 10px 20px;
+            font-size: 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        #restart-btn:hover {
+            background-color: #45a049;
+            transform: scale(1.05);
+        }
+        
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 40;
+            text-align: center;
+        }
+        
+        #start-btn {
+            padding: 10px 20px;
+            font-size: 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        #start-btn:hover {
+            background-color: #45a049;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="player"></div>
+        <div id="score-display">得分: 0</div>
+        
+        <div id="game-over">
+            <h1>游戏结束!</h1>
+            <p id="final-score">最终得分: 0</p>
+            <button id="restart-btn">重新开始</button>
+        </div>
+        
+        <div id="start-screen">
+            <h1>星空追逐战</h1>
+            <p>在浩瀚宇宙中躲避敌人的追击</p>
+            <p>使用鼠标移动绿色圆点，坚持越久得分越高!</p>
+            <button id="start-btn">开始游戏</button>
+        </div>
+    </div>
+
+    <script>
+        // 游戏变量
+        let player;
+        let enemies = [];
+        let score = 0;
+        let gameRunning = false;
+        let enemySpeed = 1;
+        let enemySpawnInterval = 2000;
+        let lastEnemySpawnTime = 0;
+        let gameAreaWidth, gameAreaHeight;
+        
+        // DOM元素
+        const gameContainer = document.getElementById('game-container');
+        const playerElement = document.getElementById('player');
+        const scoreDisplay = document.getElementById('score-display');
+        const gameOverScreen = document.getElementById('game-over');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const restartBtn = document.getElementById('restart-btn');
+        const startScreen = document.getElementById('start-screen');
+        const startBtn = document.getElementById('start-btn');
+        
+        // 初始化游戏
+        function initGame() {
+            // 设置游戏区域尺寸
+            gameAreaWidth = gameContainer.offsetWidth;
+            gameAreaHeight = gameContainer.offsetHeight;
+            
+            // 初始化玩家
+            player = {
+                x: gameAreaWidth / 2,
+                y: gameAreaHeight / 2,
+                size: 30
+            };
+            
+            updatePlayerPosition();
+            
+            // 重置游戏状态
+            enemies = [];
+            score = 0;
+            enemySpeed = 1;
+            enemySpawnInterval = 2000;
+            lastEnemySpawnTime = 0;
+            gameRunning = true;
+            
+            // 清除所有敌人
+            document.querySelectorAll('.enemy').forEach(enemy => enemy.remove());
+            
+            // 更新UI
+            scoreDisplay.textContent = `得分: ${score}`;
+            gameOverScreen.style.display = 'none';
+            startScreen.style.display = 'none';
+            
+            // 开始游戏循环
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // 更新玩家位置
+        function updatePlayerPosition() {
+            playerElement.style.left = `${player.x - player.size/2}px`;
+            playerElement.style.top = `${player.y - player.size/2}px`;
+        }
+        
+        // 创建敌人
+        function spawnEnemy() {
+            const enemySize = 25;
+            let x, y;
+            
+            // 随机生成在屏幕边缘
+            if (Math.random() < 0.5) {
+                x = Math.random() < 0.5 ? 0 : gameAreaWidth;
+                y = Math.random() * gameAreaHeight;
+            } else {
+                x = Math.random() * gameAreaWidth;
+                y = Math.random() < 0.5 ? 0 : gameAreaHeight;
+            }
+            
+            const enemy = {
+                x: x,
+                y: y,
+                size: enemySize,
+                element: document.createElement('div')
+            };
+            
+            enemy.element.className = 'enemy';
+            enemy.element.style.left = `${x - enemySize/2}px`;
+            enemy.element.style.top = `${y - enemySize/2}px`;
+            
+            gameContainer.appendChild(enemy.element);
+            enemies.push(enemy);
+        }
+        
+        // 更新敌人位置
+        function updateEnemies() {
+            enemies.forEach(enemy => {
+                // 计算敌人移动方向（朝向玩家）
+                const dx = player.x - enemy.x;
+                const dy = player.y - enemy.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // 移动敌人
+                enemy.x += (dx / distance) * enemySpeed;
+                enemy.y += (dy / distance) * enemySpeed;
+                
+                // 更新DOM元素位置
+                enemy.element.style.left = `${enemy.x - enemy.size/2}px`;
+                enemy.element.style.top = `${enemy.y - enemy.size/2}px`;
+                
+                // 检测碰撞
+                if (distance < (player.size + enemy.size) / 2) {
+                    gameOver();
+                }
+            });
+        }
+        
+        // 游戏主循环
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+            
+            // 生成新敌人
+            if (timestamp - lastEnemySpawnTime > enemySpawnInterval) {
+                spawnEnemy();
+                lastEnemySpawnTime = timestamp;
+                
+                // 随着时间增加难度
+                if (score % 5 === 0) {
+                    enemySpeed += 0.2;
+                    enemySpawnInterval = Math.max(500, enemySpawnInterval - 100);
+                }
+            }
+            
+            updateEnemies();
+            
+            // 增加分数
+            score += 0.1;
+            scoreDisplay.textContent = `得分: ${Math.floor(score)}`;
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // 游戏结束
+        function gameOver() {
+            gameRunning = false;
+            finalScoreDisplay.textContent = `最终得分: ${Math.floor(score)}`;
+            gameOverScreen.style.display = 'flex';
+        }
+        
+        // 事件监听
+        gameContainer.addEventListener('mousemove', (e) => {
+            if (!gameRunning) return;
+            
+            player.x = e.clientX;
+            player.y = e.clientY;
+            updatePlayerPosition();
+        });
+        
+        restartBtn.addEventListener('click', initGame);
+        startBtn.addEventListener('click', initGame);
+        
+        // 初始显示开始界面
+        startScreen.style.display = 'flex';
+    </script>
+</body>
+</html>
